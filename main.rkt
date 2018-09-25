@@ -1,7 +1,7 @@
 #lang racket
 
 ;; -------------------------------------------
-;; OOP Utility Methods
+;; OOP Utility Functions
 ;; -------------------------------------------
 ; Function for getting object methods
 (define (method-lookup object selector)
@@ -24,7 +24,7 @@
   (apply class parms))
 
 ;; -------------------------------------------
-;; Music Utility Methods
+;; Music Utility Functions
 ;; -------------------------------------------
 (define (get-note-duration length bpm)
   (cond ((= length 1/2) (/ 120 bpm))
@@ -46,8 +46,27 @@
         ((eqv? instrument 'telephone)  8)
         )
   )
-         
 
+(define (note-to-midi-number note octave)
+  (let ((base (cond ((eqv? note 'C) 24)
+                   ((eqv? note 'C#) 25)
+                   ((eqv? note 'D)  26)
+                   ((eqv? note 'D#) 27)
+                   ((eqv? note 'E)  28)
+                   ((eqv? note 'F)  29)
+                   ((eqv? note 'F#) 30)
+                   ((eqv? note 'G)  31)
+                   ((eqv? note 'G#) 32)
+                   ((eqv? note 'A)  33)
+                   ((eqv? note 'A#) 34)
+                   ((eqv? note 'B)  35))))
+  (* base octave)
+  )
+  )
+         
+;; -------------------------------------------
+;; Music Construction Functions
+;; -------------------------------------------
 ; Note class definition
 (define (note tone octave length instrument)
   (let ((tone       tone)
