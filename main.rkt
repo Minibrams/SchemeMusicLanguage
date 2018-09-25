@@ -34,6 +34,18 @@
         (else (error "Cannot calculate duration for an invalid time assignment: " length))
         )
   )
+
+(define (instrument-to-channel instrument)
+  (cond ((eqv? instrument 'piano)      1)
+        ((eqv? instrument 'orgran)     2)
+        ((eqv? instrument 'guitar)     3)
+        ((eqv? instrument 'violin)     4)
+        ((eqv? instrument 'flute)      5)
+        ((eqv? instrument 'trumpet)    6)
+        ((eqv? instrument 'helicopter) 7)
+        ((eqv? instrument 'telephone)  8)
+        )
+  )
          
 
 ; Note class definition
