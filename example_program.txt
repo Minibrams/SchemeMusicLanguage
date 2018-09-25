@@ -1,0 +1,5 @@
+(music-element 128 (parallel
+                   (sequence 'guitar (C 2 1/4) (D 2 1/4) (E 2 1/4) (C 2 1/4) (C 2 1/4) (D 2 1/4) (E 2 1/4) (C 2 1/4) ) ; Lead guitar
+                   (sequence 'guitar (C 1 1/4) (D 1 1/4) (E 1 1/4) (C 1 1/4) (C 1 1/4) (D 1 1/4) (E 1 1/4) (C 1 1/4) ) ; Bass guitar 
+          )
+)
