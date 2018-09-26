@@ -27,14 +27,12 @@
 ;; Music Utility Functions
 ;; -------------------------------------------
 (define (get-note-duration length bpm)
-  (let ((seconds (cond ((= length 1/2) (/ 120 bpm))
-                       ((= length 1/4) (/ 60  bpm))
-                       ((= length 1/8) (/ 30  bpm))
-                       ((= length 1/16)(/ 15  bpm))
-                       (else (error "Cannot calculate duration for an invalid time assignment: " length))
-                       )
-                ))
-    (* 960 seconds)) ; Convert from seconds to Midi time units
+  (cond ((= length 1/2) (/ 120 bpm))
+        ((= length 1/4) (/ 60  bpm))
+        ((= length 1/8) (/ 30  bpm))
+        ((= length 1/16)(/ 15  bpm))
+        (else (error "Cannot calculate duration for an invalid time assignment: " length))
+        )
   )
 
 (define (instrument-to-channel instrument)
@@ -93,37 +91,14 @@
     
     self)) ; Return the handler when object is instantiated
 
-; Functions for creating musical notes
+; Function for creating a C# note
 (define (C# octave length)
   (lambda (instrument)
   (new-instance note 'C# octave length instrument)))
 
-(define (C octave length)
-  (lambda (instrument)
-  (new-instance note 'C octave length instrument)))
-
-(define (D octave length)
-  (lambda (instrument)
-  (new-instance note 'D octave length instrument)))
-
-(define (E octave length)
-  (lambda (instrument)
-  (new-instance note 'E octave length instrument)))
-
 (define (sequence instrument . list-of-notes)
   (map (lambda (unfinished-note) (unfinished-note instrument))
        list-of-notes))
-
-;; -------------------------------------------
-;; Demo
-;; -------------------------------------------
-
-(define music-piece (sequence 'guitar (C 2 1/4) (D 2 1/4) (E 2 1/4) (C 2 1/4) (C 2 1/4)))
-(define first-note (car music-piece))
-(send 'gettone first-note)
-(send 'getinstrument first-note)
-
-
 
 
 
