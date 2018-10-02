@@ -1,31 +1,11 @@
 #lang racket
 
-;; -------------------------------------------
-;; OOP Utility Functions
-;; -------------------------------------------
-; Function for getting object methods
-(define (method-lookup object selector)
-  (cond ((procedure? object)
-         (let ((result (object selector)))
-           (if (procedure? result)
-               result
-               (error "Did not find any method")))
-        )
-        (else
-         (error "Inappropriate object in method-lookup: " object))))
-
-; Function for calling object methods with parms
-(define (send message obj . par)
-  (let ((method (method-lookup obj message)))
-    (apply method par)))
-
-; Function for creating new instances of classes
-(define (new-instance class . parms)
-  (apply class parms))
 
 ;; -------------------------------------------
 ;; Music Utility Functions
 ;; -------------------------------------------
+
+; Convert fraction-durations to MIDI time units
 (define (get-note-duration length bpm)
   (let ((seconds (cond ((= length 1/2) (/ 120 bpm))
                        ((= length 1/4) (/ 60  bpm))
@@ -34,9 +14,10 @@
                        (else (error "Cannot calculate duration for an invalid time assignment: " length))
                        )
                 ))
-    (* 960 seconds)) ; Convert from seconds to Midi time units
+    (* 960 seconds)) ; Convert from seconds to MIDI time units
   )
 
+; Map a known instrument to a MIDI channel
 (define (instrument-to-channel instrument)
   (cond ((eqv? instrument 'piano)      1)
         ((eqv? instrument 'orgran)     2)
@@ -49,6 +30,7 @@
         )
   )
 
+; Map a musical note to a MIDI number
 (define (note-to-midi-number note octave)
   (let ((base (cond ((eqv? note 'C)  24)
                     ((eqv? note 'C#) 25)
@@ -65,65 +47,278 @@
       (+ base (* 12 octave))
     )
   )
-         
+
+
+
 ;; -------------------------------------------
-;; Music Construction Functions
+;; OOP Utility Functions
 ;; -------------------------------------------
-; Note class definition
-(define (note tone octave length instrument)
-  (let ((tone       tone)
-        (octave     octave)
-        (length     length)
-        (instrument instrument))
+; Function for getting object methods
+(define (method-lookup object selector)
+  (cond ((procedure? object) (object selector))
+        (else (error "Inappropriate object in method-lookup: " object))))
+
+; Function for calling object methods with parms
+(define (send message obj . par)
+  (let ((method (method-lookup obj message)))
+    (cond ((procedure? method) (apply method par))
+          ((null? method) (error "Message not understood: " message))
+          (else (error "Inappropriate result of method look-up: " method)))))
+
+; Function for creating new instances of classes
+(define (new-instance class . parms)
+  (let ((instance (apply class parms)))
+    (virtual-operations instance)
+    instance))
+
+; Virtual operations - propagate set-self through inheritance tree
+(define (virtual-operations object)
+  (send 'set-self! object object))
+
+; Function for creating new parts of classes
+(define (new-part class . parms)
+  (apply class parms))
+
+;; -------------------------------------------
+;; Classes
+;; -------------------------------------------
+
+; Music element - this is the base for Notes, Sequences, and Parallel.
+(define (music-element start-time duration . music-elements)
+  (let ((super '())
+        (self 'nil))
+
+    (let ((start-time start-time)
+          (duration   duration))
+      
+      (define (set-self! object-part)
+        (set! self object-part))
+      
+      (define (get-type)       'music-element)
+      (define (get-start-time) start-time)
+      (define (get-duration)   duration)
+      (define (get-info)(list  (get-type)
+                               (get-start-time)
+                               (get-duration)))
     
-    (define (gettone)       tone)
-    (define (getoctave)     octave)
-    (define (getlength)     length)
-    (define (getinstrument) instrument)
+      (define (dispatch message)
+        (cond ((eqv? message 'set-self!)      set-self!)
+              ((eqv? message 'get-type)       get-type)
+              ((eqv? message 'get-start-time) get-start-time)
+              ((eqv? message 'get-duration)   get-duration)
+              ((eqv? message 'get-info)       get-info)
+              (else '())))
 
-    (define (gettype) 'note)
-
-    (define (self message)
-      (cond ((eqv? message 'gettone)       gettone)
-            ((eqv? message 'getoctave)     getoctave)
-            ((eqv? message 'getlength)     getlength)
-            ((eqv? message 'getinstrument) getinstrument)
-            ((eqv? message 'gettype)       gettype)
-            (else (error "Message not understood: " message))))
+      (set! self dispatch)
+      )
     
-    self)) ; Return the handler when object is instantiated
-
-; Functions for creating musical notes
-(define (C# octave length)
-  (lambda (instrument)
-  (new-instance note 'C# octave length instrument)))
-
-(define (C octave length)
-  (lambda (instrument)
-  (new-instance note 'C octave length instrument)))
-
-(define (D octave length)
-  (lambda (instrument)
-  (new-instance note 'D octave length instrument)))
-
-(define (E octave length)
-  (lambda (instrument)
-  (new-instance note 'E octave length instrument)))
-
-(define (sequence instrument . list-of-notes)
-  (map (lambda (unfinished-note) (unfinished-note instrument))
-       list-of-notes))
-
-;; -------------------------------------------
-;; Demo
-;; -------------------------------------------
-
-(define music-piece (sequence 'guitar (C 2 1/4) (D 2 1/4) (E 2 1/4) (C 2 1/4) (C 2 1/4)))
-(define first-note (car music-piece))
-(send 'gettone first-note)
-(send 'getinstrument first-note)
+    self))
 
 
+; Note - inherits from music-element. 
+(define (note start-time tone octave length instrument)
+  (let ((super (new-part music-element start-time length))
+        (self 'nil))
+
+    (let ((tone       tone)
+          (octave     octave)
+          (length     length)
+          (instrument instrument))
+
+      (define (get-tone)       tone)
+      (define (get-octave)     octave)
+      (define (get-instrument) instrument)
+      (define (get-type)       'note)
+      (define (get-info) (list (send 'get-start-time super)
+                               (get-tone)
+                               (get-octave)
+                               (send 'get-duration super)
+                               (get-instrument)
+                               (get-type)))
+      
+      (define (to-absolute-time)
+        (list 
+              (instrument-to-channel instrument)  ; Channel no.
+              (note-to-midi-number tone octave)   ; Note no.
+              80                                  ; Velocity (constant)
+              (get-note-duration length 120)))    ; Duration
+      
+      
+      (define (set-self! object-part)
+        (set! self object-part)
+        (send 'set-self! super object-part))
+
+      (define (dispatch message)
+        (cond ((eqv? message 'get-tone)         get-tone)
+              ((eqv? message 'get-octave)       get-octave)
+              ((eqv? message 'get-instrument)   get-instrument)
+              ((eqv? message 'to-absolute-time) to-absolute-time)
+              ((eqv? message 'get-type)         get-type)
+              ((eqv? message 'get-info)         get-info)
+              ((eqv? message 'set-self!)        set-self!)
+              (else (method-lookup super message))))
+      (set! self dispatch)
+    )
+    self)) ; Return self handler
 
 
+; Sequence
+(define (sequential-music-element instrument start-time length . music-elements)
+  (let ((super (new-part music-element start-time length))
+        (self 'nil))
+
+    (define (get-type) 'sequence)
+    (define (get-info) (map (lambda (element) (send 'get-info element)) (get-elements)))
+    (define (get-elements) (car music-elements))
+
+    (define (set-self! object-part)
+        (set! self object-part)
+        (send 'set-self! super object-part))
+
+    (define (dispatch message)
+      (cond ((eqv? message 'get-info)     get-info)
+            ((eqv? message 'get-elements) get-elements)
+            ((eqv? message 'get-type)     get-type)
+            (else (method-lookup super message))))
+    (set! self dispatch)
+
+    self))
+
+(define (parallel-music-element instrument start-time length . music-elements)
+  (let ((super (new-part music-element start-time length))
+        (self 'nil))
+
+    (define (get-type) 'parallel)
+    (define (get-info) (map (lambda (element) (send 'get-info element)) (get-elements)))
+    (define (get-elements) (car music-elements))
+
+    (define (set-self! object-part)
+        (set! self object-part)
+        (send 'set-self! super object-part))
+
+    (define (dispatch message)
+      (cond ((eqv? message 'get-type)     get-type)
+            ((eqv? message 'get-info)     get-info)
+            ((eqv? message 'get-elements) get-elements)
+            (else (method-lookup super message))))
+
+    (set! self dispatch)
+    self))
+
+
+; Note construction functions
+(define (C length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'C octave length instrument)))
+
+(define (C# length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'C# octave length instrument)))
+
+(define (D length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'D octave length instrument)))
+
+(define (D# length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'D# octave length instrument)))
+
+(define (E length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'E octave length instrument)))
+
+(define (F length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'F octave length instrument)))
+
+(define (F# length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'F# octave length instrument)))
+
+(define (G length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'G octave length instrument)))
+
+(define (G# length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'G# octave length instrument)))
+
+(define (A length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'A octave length instrument)))
+
+(define (A# length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'A# octave length instrument)))
+
+(define (B length octave)
+  (lambda (instrument start-time)
+    (new-instance note start-time 'B octave length instrument)))
+
+
+; Sequence construction functions
+(define (sequence . music-elements)
+  (lambda (instrument start-time)
+    
+    (define (reduce)
+      (reduce-helper music-elements start-time '()))
+
+    (define (reduce-helper music-elements acc-time acc)
+      (cond ((null? music-elements) (cons acc acc-time)) ; Return both the accumulated music elements and the accumulated time of the sequence.
+            (else (let ((element ((car music-elements) instrument acc-time)))
+                    (reduce-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
+    
+    (let ((full-notes (reduce)))
+      (new-instance sequential-music-element instrument start-time (cdr full-notes) (car full-notes))
+      )
+    )
+  )
+
+; Parallel construction functions
+(define (parallel . music-elements)
+  (lambda (instrument start-time)
+
+    (define (reduce)
+      (reduce-helper music-elements '() 0))
+
+    (define (reduce-helper music-elements acc max-length)
+      (cond ((null? music-elements) (cons acc max-length))
+            (else (let ((element ((car music-elements) instrument start-time)))
+                    (let ((duration (send 'get-duration element)))
+                      (reduce-helper (cdr music-elements) (append acc (list element)) (cond ((> duration max-length) duration)
+                                                                                            (else                    max-length)))
+                      )
+                    )
+                    
+                  )
+            )
+      )
+
+    (let ((full-elements (reduce)))
+    (new-instance parallel-music-element instrument start-time (cdr full-elements) (car full-elements))
+      )
+    )
+  )
+
+
+; Instrument construction functions
+(define (instrument instrum music-element)
+  (music-element instrum 0))
+
+
+
+; Demo
+(define bigseq (parallel (parallel (sequence (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2))
+                                   (parallel (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2)))
+                         (sequence (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2))))
+
+(define bigseqreal (bigseq 'guitar 0))
+
+
+(define song (instrument 'guitar (parallel (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
+                                           (sequence (C# 1/2 1) (D 1/8 1) (F 1/16 1))
+                                           (sequence (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
+                                                     (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))))))
+
+(send 'get-info song)
 
