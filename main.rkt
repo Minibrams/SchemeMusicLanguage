@@ -143,7 +143,7 @@
     (define (get-midi)
         (cons 'note-abs-time-with-duration (list
               (get-note-duration start-time 120) ; Absolute start time
-              0  ; Channel no.
+              1  ; Channel no.
               0  ; Note no.
               0  ; Velocity (constant)
               (get-note-duration length 120)))) ; Duration
@@ -372,7 +372,7 @@
 (define song (instrument 'piano (parallel (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
                                             (sequence (C# 1/2 1) (D 1/8 1) (F 1/16 1))
                                             (sequence (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
-                                                      (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))))))
+                                                      (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4) (Pause 1/1))))))
 
 (send 'get-info song)
 (send 'get-midi song)
