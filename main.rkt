@@ -6,18 +6,6 @@
 ;; -------------------------------------------
 
 ; Convert fraction-durations to MIDI time units
-(define (get-note-duration-old length bpm)
-  (let ((seconds (cond ((= length 0) 0)            
-                       ((= length 1/2) (/ 120 bpm))
-                       ((= length 1/4) (/ 60  bpm))
-                       ((= length 1/8) (/ 30  bpm))
-                       ((= length 1/16)(/ 15  bpm))
-                       (else (error "Cannot calculate duration for an invalid time assignment: " length))
-                       )
-                ))
-    (* 960 seconds)) ; Convert from seconds to MIDI time units
-  )
-
 (define (get-note-duration length bpm)
   (let ((seconds-per-measure (* 60 (/ 4 bpm)))) ; Assuming 4/4 measures
     (*(* length seconds-per-measure) 960) ; Seconds to MIDI time units
@@ -319,7 +307,7 @@
       (reduce-helper music-elements start-time '())) ; Start time increases for each subsequence element 
 
     (define (reduce-helper music-elements acc-time acc)
-      (cond ((null? music-elements) (cons acc acc-time)) ; Return both the accumulated music elements and the accumulated time of the sequence.
+      (cond ((null? music-elements) (cons acc (- acc-time start-time))) ; Return both the accumulated music elements and the accumulated time of the sequence.
             (else (let ((element ((car music-elements) instrument acc-time)))
                     (reduce-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
     
@@ -368,11 +356,24 @@
 
 
 
-; Demo
-(define song (instrument 'piano (parallel (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
-                                            (sequence (C# 1/2 1) (D 1/8 1) (F 1/16 1))
-                                            (sequence (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
-                                                      (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4) (Pause 1/1))))))
+; Demo - Mester Jakob
+(define song (instrument 'trumpet (parallel (sequence (sequence (C 1/2 3) (D 1/2 3) (E 1/2 3) (C 1/2 3))
+                                                      (sequence (C 1/2 3) (D 1/2 3) (E 1/2 3) (C 1/2 3))
+                                                      (sequence (E 1/2 3) (F 1/2 3) (G 1/1 3))
+                                                      (sequence (E 1/2 3) (F 1/2 3) (G 1/1 3))
+                                                      (sequence (G 1/4 3) (A 1/4 3) (G 1/4 3) (F 1/4 3) (E 1/2 3) (C 1/2 3))
+                                                      (sequence (G 1/4 3) (A 1/4 3) (G 1/4 3) (F 1/4 3) (E 1/2 3) (C 1/2 3))
+                                                      (sequence (C 1/2 3) (G 1/2 2) (C 1/1 3))
+                                                      (sequence (C 1/2 3) (G 1/2 2) (C 1/1 3)))
+                                            
+                                            (sequence (sequence (C 1/2 2) (D 1/2 2) (E 1/2 2) (C 1/2 2))
+                                                      (sequence (C 1/2 2) (D 1/2 2) (E 1/2 2) (C 1/2 2))
+                                                      (sequence (E 1/2 2) (F 1/2 2) (G 1/1 2))
+                                                      (sequence (E 1/2 2) (F 1/2 2) (G 1/1 2))
+                                                      (sequence (G 1/4 2) (A 1/4 2) (G 1/4 2) (F 1/4 2) (E 1/2 2) (C 1/2 2))
+                                                      (sequence (G 1/4 2) (A 1/4 2) (G 1/4 2) (F 1/4 2) (E 1/2 2) (C 1/2 2))
+                                                      (sequence (C 1/2 2) (G 1/2 1) (C 1/1 2))
+                                                      (sequence (C 1/2 2) (G 1/2 1) (C 1/1 2))))))
 
 (send 'get-info song)
 (send 'get-midi song)
