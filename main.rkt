@@ -392,29 +392,29 @@
         ))
 
 (define (sea-shanty-intro)
-  (sequence (A 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/4 4) (Pause 1/8)
-            (C# 1/8 4) (D 1/8 4) (E 1/8 4) (F# 1/8 4) (G# 1/8 4) (E 1/4 4) (Pause 1/4)
-            (F# 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/4 4) (Pause 1/4)
-            (A 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/4 4) (Pause 1/8)
-            (Pause 1/8) (C# 1/8 4) (D 1/8 4) (E 1/8 4) (F# 1/8 4) (D 1/4 4) (Pause 1/4)
-            (F# 1/8 4) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (F# 1/8 4) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (A 1/4 3) (Pause 1/4)))
+  (sequence (A 1/8 4)   (Pause 1/8) (E 1/8 4) (D 1/8 4)  (C# 1/4 4) (Pause 1/8)
+            (C# 1/8 4)  (D 1/8 4)   (E 1/8 4) (F# 1/8 4) (G# 1/8 4) (E 1/4 4)   (Pause 1/4)
+            (F# 1/8 4)  (Pause 1/8) (E 1/8 4) (D 1/8 4)  (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/4 4) (Pause 1/4)
+            (A 1/8 4)   (Pause 1/8) (E 1/8 4) (D 1/8 4)  (C# 1/4 4) (Pause 1/8)
+            (Pause 1/8) (C# 1/8 4)  (D 1/8 4) (E 1/8 4)  (F# 1/8 4) (D 1/4 4)   (Pause 1/4)
+            (F# 1/8 4)  (E 1/8 4)   (D 1/8 4) (C# 1/8 4) (B 1/8 3)  (C# 1/8 4)  (D 1/8 4)  (F# 1/8 4)  (E 1/8 4) (D 1/8 4)   (C# 1/8 4) (B 1/8 3)   (A 1/4 3) (Pause 1/4)))
 
 (define (sea-shanty-verse)
-  (parallel (sequence (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
-            (A 1/8 3) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/2 4) (Pause 1/2)
-            (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (Pause 1/8) (E 1/8 4) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
-            (A 1/8 3) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (A 1/8 3) (Pause 1/8) (C# 1/2 4) (Pause 1/2))
+  (parallel (sequence (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
+                      (A 1/8 3)  (B 1/8 3) (C# 1/8 4) (D 1/8 4)   (C# 1/8 4) (Pause 1/8) (B 1/8 3)  (Pause 1/8) (C# 1/2 4) (Pause 1/2)
+                      (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/8 4)  (C# 1/8 4)  (B 1/8 3)  (Pause 1/8) (E 1/8 4) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
+                      (A 1/8 3)  (B 1/8 3) (C# 1/8 4) (D 1/8 4)   (C# 1/8 4) (Pause 1/8) (A 1/8 3)  (Pause 1/8) (C# 1/2 4) (Pause 1/2))
 
             (sequence (A 1/4 1) (Pause 1/4) (E 1/4 2) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
-            (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
-            (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (E 1/4 0) (B 1/4 1) (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/2 1) (Pause 1/2)
-            (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2))))
+                      (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
+                      (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (E 1/4 0) (B 1/4 1) (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/2 1) (Pause 1/2)
+                      (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2))))
   
 
 
 ; Demo
-(define song (instrument 'trumpet (sequence (sea-shanty-intro)
-                                            (sea-shanty-verse))))
+(define song (instrument 'guitar (sequence (sea-shanty-intro)
+                                           (sea-shanty-verse))))
 
 (send 'get-info song)
 (flatten(send 'get-midi song))
