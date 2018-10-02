@@ -130,11 +130,11 @@
 
     (define (get-midi)
         (cons 'note-abs-time-with-duration (list
-              (get-note-duration start-time 120) ; Absolute start time
+              (get-note-duration start-time 100) ; Absolute start time
               1  ; Channel no.
               0  ; Note no.
               0  ; Velocity (constant)
-              (get-note-duration length 120)))) ; Duration
+              (get-note-duration length 100)))) ; Duration
 
     (define (dispatch message)
       (cond ((eqv? message 'get-info)  get-info)
@@ -169,11 +169,11 @@
       
       (define (get-midi)
         (cons 'note-abs-time-with-duration (list
-              (get-note-duration start-time 120)  ; Absolute start time
+              (get-note-duration start-time 100)  ; Absolute start time
               (instrument-to-channel instrument)  ; Channel no.
               (note-to-midi-number tone octave)   ; Note no.
               80                                  ; Velocity (constant)
-              (get-note-duration length 120))))    ; Duration
+              (get-note-duration length 100))))    ; Duration
       
       
       (define (set-self! object-part)
@@ -308,7 +308,7 @@
 
     (define (reduce-helper music-elements acc-time acc)
       (cond ((null? music-elements) (cons acc (- acc-time start-time))) ; Return both the accumulated music elements and the accumulated time of the sequence.
-            (else (let ((element ((car music-elements) instrument acc-time)))
+            (else (let ((element ((car music-elements) instrument acc-time))) ; Uncurry the sequence
                     (reduce-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
     
     (let ((reduction (reduce))) ; reduction = (accumulated duration . music elements)
@@ -329,7 +329,7 @@
 
     (define (reduce-helper music-elements acc max-length)
       (cond ((null? music-elements) (cons acc max-length)) ; Return the accumulated music elements as well as the longest duration
-            (else (let ((element ((car music-elements) instrument start-time)))
+            (else (let ((element ((car music-elements) instrument start-time))) ; Uncurry the parallel composition
                     (let ((duration (send 'get-duration element)))
                       (reduce-helper (cdr music-elements) (append acc (list element)) (cond ((> duration max-length) duration)
                                                                                             (else                    max-length)))
@@ -354,27 +354,69 @@
 (define (instrument instrum music-element)
   (music-element instrum 0))
 
+(define (flatten song)
+  (cond ((null? song) '())
+        ((eqv? (car song) 'note-abs-time-with-duration) (list song))
+        ((pair? (car song))
+         (append (flatten (car song))
+                 (flatten (cdr song))))
+        (else (cons (car song) (flatten (cdr song))))))
 
 
-; Demo - Mester Jakob
-(define song (instrument 'trumpet (parallel (sequence (sequence (C 1/2 3) (D 1/2 3) (E 1/2 3) (C 1/2 3))
-                                                      (sequence (C 1/2 3) (D 1/2 3) (E 1/2 3) (C 1/2 3))
-                                                      (sequence (E 1/2 3) (F 1/2 3) (G 1/1 3))
-                                                      (sequence (E 1/2 3) (F 1/2 3) (G 1/1 3))
-                                                      (sequence (G 1/4 3) (A 1/4 3) (G 1/4 3) (F 1/4 3) (E 1/2 3) (C 1/2 3))
-                                                      (sequence (G 1/4 3) (A 1/4 3) (G 1/4 3) (F 1/4 3) (E 1/2 3) (C 1/2 3))
-                                                      (sequence (C 1/2 3) (G 1/2 2) (C 1/1 3))
-                                                      (sequence (C 1/2 3) (G 1/2 2) (C 1/1 3)))
-                                            
-                                            (sequence (sequence (C 1/2 2) (D 1/2 2) (E 1/2 2) (C 1/2 2))
-                                                      (sequence (C 1/2 2) (D 1/2 2) (E 1/2 2) (C 1/2 2))
-                                                      (sequence (E 1/2 2) (F 1/2 2) (G 1/1 2))
-                                                      (sequence (E 1/2 2) (F 1/2 2) (G 1/1 2))
-                                                      (sequence (G 1/4 2) (A 1/4 2) (G 1/4 2) (F 1/4 2) (E 1/2 2) (C 1/2 2))
-                                                      (sequence (G 1/4 2) (A 1/4 2) (G 1/4 2) (F 1/4 2) (E 1/2 2) (C 1/2 2))
-                                                      (sequence (C 1/2 2) (G 1/2 1) (C 1/1 2))
-                                                      (sequence (C 1/2 2) (G 1/2 1) (C 1/1 2))))))
+; Misc functions
+; Chord construction function - simply constructs a parallel composition with a given length and predefined notes.
+(define (chord tone length)
+  (cond ((eqv? tone 'Cd) (parallel (C length 2)
+                                   (E length 3)
+                                   (G length 3)
+                                   (C length 3)
+                                   (E length 4)))
+        
+        ((eqv? tone 'Cm) (parallel (C length 2)
+                                   (D# length 3)
+                                   (G length 3)
+                                   (C length 3)
+                                   (E length 4)))
+
+        ((eqv? tone 'Gd) (parallel (G length 2)
+                                   (B length 3)
+                                   (D length 3)
+                                   (G length 3)
+                                   (D length 4)
+                                   (G length 5)))
+        
+        ((eqv? tone 'Dd) (parallel (D length 2)
+                                   (A length 3)
+                                   (D length 3)
+                                   (F# length 4)))
+        ))
+
+(define (sea-shanty-intro)
+  (sequence (A 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/4 4) (Pause 1/8)
+            (C# 1/8 4) (D 1/8 4) (E 1/8 4) (F# 1/8 4) (G# 1/8 4) (E 1/4 4) (Pause 1/4)
+            (F# 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/4 4) (Pause 1/4)
+            (A 1/8 4) (Pause 1/8) (E 1/8 4) (D 1/8 4) (C# 1/4 4) (Pause 1/8)
+            (Pause 1/8) (C# 1/8 4) (D 1/8 4) (E 1/8 4) (F# 1/8 4) (D 1/4 4) (Pause 1/4)
+            (F# 1/8 4) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (F# 1/8 4) (E 1/8 4) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (A 1/4 3) (Pause 1/4)))
+
+(define (sea-shanty-verse)
+  (parallel (sequence (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
+            (A 1/8 3) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/2 4) (Pause 1/2)
+            (C# 1/8 4) (B 1/8 3) (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/8 4) (C# 1/8 4) (B 1/8 3) (Pause 1/8) (E 1/8 4) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
+            (A 1/8 3) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (A 1/8 3) (Pause 1/8) (C# 1/2 4) (Pause 1/2))
+
+            (sequence (A 1/4 1) (Pause 1/4) (E 1/4 2) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
+            (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
+            (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (E 1/4 0) (B 1/4 1) (E 1/4 1) (Pause 1/4) (B 1/4 1) (Pause 1/4) (E 1/2 1) (Pause 1/2)
+            (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2))))
+  
+
+
+; Demo
+(define song (instrument 'trumpet (sequence (sea-shanty-intro)
+                                            (sea-shanty-verse))))
 
 (send 'get-info song)
-(send 'get-midi song)
+(flatten(send 'get-midi song))
+
 
