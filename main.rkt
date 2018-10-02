@@ -6,8 +6,9 @@
 ;; -------------------------------------------
 
 ; Convert fraction-durations to MIDI time units
-(define (get-note-duration length bpm)
-  (let ((seconds (cond ((= length 1/2) (/ 120 bpm))
+(define (get-note-duration-old length bpm)
+  (let ((seconds (cond ((= length 0) 0)            
+                       ((= length 1/2) (/ 120 bpm))
                        ((= length 1/4) (/ 60  bpm))
                        ((= length 1/8) (/ 30  bpm))
                        ((= length 1/16)(/ 15  bpm))
@@ -17,10 +18,16 @@
     (* 960 seconds)) ; Convert from seconds to MIDI time units
   )
 
+(define (get-note-duration length bpm)
+  (let ((seconds-per-measure (* 60 (/ 4 bpm)))) ; Assuming 4/4 measures
+    (*(* length seconds-per-measure) 960) ; Seconds to MIDI time units
+    )
+  )
+
 ; Map a known instrument to a MIDI channel
 (define (instrument-to-channel instrument)
   (cond ((eqv? instrument 'piano)      1)
-        ((eqv? instrument 'orgran)     2)
+        ((eqv? instrument 'organ)      2)
         ((eqv? instrument 'guitar)     3)
         ((eqv? instrument 'violin)     4)
         ((eqv? instrument 'flute)      5)
@@ -83,13 +90,13 @@
 ;; Classes
 ;; -------------------------------------------
 
-; Music element - this is the base for Notes, Sequences, and Parallel.
+; Music element class - this is the base for Notes, Sequences, and Parallel.
 (define (music-element start-time duration . music-elements)
   (let ((super '())
         (self 'nil))
 
-    (let ((start-time start-time)
-          (duration   duration))
+    (let ((start-time       start-time)
+          (duration         duration))
       
       (define (set-self! object-part)
         (set! self object-part))
@@ -100,6 +107,9 @@
       (define (get-info)(list  (get-type)
                                (get-start-time)
                                (get-duration)))
+
+      (define (get-midi)
+        (map (lambda (element) (send 'get-midi element)) (car music-elements)))
     
       (define (dispatch message)
         (cond ((eqv? message 'set-self!)      set-self!)
@@ -107,6 +117,7 @@
               ((eqv? message 'get-start-time) get-start-time)
               ((eqv? message 'get-duration)   get-duration)
               ((eqv? message 'get-info)       get-info)
+              ((eqv? message 'get-midi)       get-midi)
               (else '())))
 
       (set! self dispatch)
@@ -115,7 +126,39 @@
     self))
 
 
-; Note - inherits from music-element. 
+; Pause class
+(define (pause start-time length)
+  (let ((super (new-part music-element start-time length))
+        (self 'nil))
+
+    (define (get-type) 'pause)
+    (define (get-info) (list (send 'get-start-time super)
+                             (send 'get-duration super)
+                             (get-type)))
+    
+    (define (set-self! object-part)
+        (set! self object-part)
+        (send 'set-self! super object-part))
+
+    (define (get-midi)
+        (cons 'note-abs-time-with-duration (list
+              (get-note-duration start-time 120) ; Absolute start time
+              0  ; Channel no.
+              0  ; Note no.
+              0  ; Velocity (constant)
+              (get-note-duration length 120)))) ; Duration
+
+    (define (dispatch message)
+      (cond ((eqv? message 'get-info)  get-info)
+            ((eqv? message 'get-type)  get-type)
+            ((eqv? message 'get-midi)  get-midi)
+            (else (method-lookup super message))))
+
+    (set! self dispatch)
+
+    self))
+
+; Note class
 (define (note start-time tone octave length instrument)
   (let ((super (new-part music-element start-time length))
         (self 'nil))
@@ -136,12 +179,13 @@
                                (get-instrument)
                                (get-type)))
       
-      (define (to-absolute-time)
-        (list 
+      (define (get-midi)
+        (cons 'note-abs-time-with-duration (list
+              (get-note-duration start-time 120)  ; Absolute start time
               (instrument-to-channel instrument)  ; Channel no.
               (note-to-midi-number tone octave)   ; Note no.
               80                                  ; Velocity (constant)
-              (get-note-duration length 120)))    ; Duration
+              (get-note-duration length 120))))    ; Duration
       
       
       (define (set-self! object-part)
@@ -152,7 +196,7 @@
         (cond ((eqv? message 'get-tone)         get-tone)
               ((eqv? message 'get-octave)       get-octave)
               ((eqv? message 'get-instrument)   get-instrument)
-              ((eqv? message 'to-absolute-time) to-absolute-time)
+              ((eqv? message 'get-midi)         get-midi)
               ((eqv? message 'get-type)         get-type)
               ((eqv? message 'get-info)         get-info)
               ((eqv? message 'set-self!)        set-self!)
@@ -162,9 +206,9 @@
     self)) ; Return self handler
 
 
-; Sequence
+; Sequence class
 (define (sequential-music-element instrument start-time length . music-elements)
-  (let ((super (new-part music-element start-time length))
+  (let ((super (new-part music-element start-time length (car music-elements)))
         (self 'nil))
 
     (define (get-type) 'sequence)
@@ -184,8 +228,9 @@
 
     self))
 
+; Parallel composition class
 (define (parallel-music-element instrument start-time length . music-elements)
-  (let ((super (new-part music-element start-time length))
+  (let ((super (new-part music-element start-time length (car music-elements)))
         (self 'nil))
 
     (define (get-type) 'parallel)
@@ -207,6 +252,9 @@
 
 
 ; Note construction functions
+; ---------------------------
+; Curry functions allowing us to supply the notes
+; with an instrument and start-time at a later point.
 (define (C length octave)
   (lambda (instrument start-time)
     (new-instance note start-time 'C octave length instrument)))
@@ -255,34 +303,44 @@
   (lambda (instrument start-time)
     (new-instance note start-time 'B octave length instrument)))
 
+(define (Pause length)
+  (lambda (instrument start-time)
+    (new-instance pause start-time length)))
+
 
 ; Sequence construction functions
+; ---------------------------
+; Curry functions allowing us to supply the sequences
+; with an instrument and start-time at a later point.
 (define (sequence . music-elements)
   (lambda (instrument start-time)
     
     (define (reduce)
-      (reduce-helper music-elements start-time '()))
+      (reduce-helper music-elements start-time '())) ; Start time increases for each subsequence element 
 
     (define (reduce-helper music-elements acc-time acc)
       (cond ((null? music-elements) (cons acc acc-time)) ; Return both the accumulated music elements and the accumulated time of the sequence.
             (else (let ((element ((car music-elements) instrument acc-time)))
                     (reduce-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
     
-    (let ((full-notes (reduce)))
-      (new-instance sequential-music-element instrument start-time (cdr full-notes) (car full-notes))
+    (let ((reduction (reduce))) ; reduction = (accumulated duration . music elements)
+      (new-instance sequential-music-element instrument start-time (cdr reduction) (car reduction))
       )
     )
   )
 
 ; Parallel construction functions
+; ---------------------------
+; Curry functions allowing us to supply the parallel compositions
+; with an instrument and start-time at a later point.
 (define (parallel . music-elements)
   (lambda (instrument start-time)
 
     (define (reduce)
-      (reduce-helper music-elements '() 0))
+      (reduce-helper music-elements '() 0)) ; Start time is 0 because we are in parallel
 
     (define (reduce-helper music-elements acc max-length)
-      (cond ((null? music-elements) (cons acc max-length))
+      (cond ((null? music-elements) (cons acc max-length)) ; Return the accumulated music elements as well as the longest duration
             (else (let ((element ((car music-elements) instrument start-time)))
                     (let ((duration (send 'get-duration element)))
                       (reduce-helper (cdr music-elements) (append acc (list element)) (cond ((> duration max-length) duration)
@@ -294,31 +352,28 @@
             )
       )
 
-    (let ((full-elements (reduce)))
-    (new-instance parallel-music-element instrument start-time (cdr full-elements) (car full-elements))
+    (let ((reduction (reduce))) ; reduction = (longest duration . music elements)
+    (new-instance parallel-music-element instrument start-time (cdr reduction) (car reduction))
       )
     )
   )
 
 
 ; Instrument construction functions
+; ---------------------------
+; When this function is called, the curry
+; functions are envoked fully, creating the music elements.
 (define (instrument instrum music-element)
   (music-element instrum 0))
 
 
 
 ; Demo
-(define bigseq (parallel (parallel (sequence (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2))
-                                   (parallel (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2)))
-                         (sequence (C# 1/2 2) (C# 1/2 2) (C# 1/2 2) (C# 1/2 2))))
-
-(define bigseqreal (bigseq 'guitar 0))
-
-
-(define song (instrument 'guitar (parallel (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
-                                           (sequence (C# 1/2 1) (D 1/8 1) (F 1/16 1))
-                                           (sequence (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
-                                                     (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))))))
+(define song (instrument 'piano (parallel (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
+                                            (sequence (C# 1/2 1) (D 1/8 1) (F 1/16 1))
+                                            (sequence (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))
+                                                      (sequence (C# 1/2 2) (D 1/8 3) (F 1/16 4))))))
 
 (send 'get-info song)
+(send 'get-midi song)
 
