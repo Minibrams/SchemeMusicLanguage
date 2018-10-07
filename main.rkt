@@ -1,14 +1,61 @@
 #lang racket
 
+;; -------------------------------------------
+;; General Utility Functions
+;; -------------------------------------------
+
+; Used for replacing key-value pairs in association lists
+(define (replace symbol value ass-list)
+  (replace-helper symbol value ass-list '()))
+
+(define (replace-helper symbol value ass-list acc)
+  (cond ((null? ass-list) acc)
+        (else (let ((first-pair (car ass-list)))
+                (cond ((eqv? (car first-pair) symbol) (replace-helper symbol value (cdr ass-list) (cons (cons symbol value) acc)))
+                      (else (replace-helper symbol value (cdr ass-list) (cons first-pair acc))))))))
+
+; So we can see whether we have an atom or something else (list, pair, etc.)
+(define (atom? x) (not (or (pair? x) (null? x))))
+
 
 ;; -------------------------------------------
 ;; Music Utility Functions
 ;; -------------------------------------------
 
+; Reinstrument a list of association lists
+(define (reinstrument flat-midi instrument)
+  (map (lambda (ass-list) (replace 'channel-no (instrument-to-channel instrument) ass-list)) flat-midi))
+
+; Scale a list of association lists
+(define (scale-start-time flat-midi factor)
+  (map (lambda (ass-list) (let ((start-time (cdr(assoc 'abs-start-time ass-list))))
+                            (replace 'abs-start-time (exact-floor(/ start-time factor)) ass-list))) flat-midi))
+
+(define (scale-duration flat-midi factor)
+  (map (lambda (ass-list) (let ((duration (cdr(assoc 'duration ass-list))))
+                            (replace 'duration (exact-floor(/ duration factor)) ass-list))) flat-midi))
+
+(define (scale flat-midi factor)
+  (scale-start-time (scale-duration flat-midi factor) factor))
+
+; Transpose a list of association lists
+(define (transpose flat-midi amount)
+  (map (lambda (ass-list) (let ((note-no (cdr(assoc 'note-no ass-list))))
+                            (replace 'note-no (+ amount note-no) ass-list))) flat-midi))
+
+; Convert a list of assofication lists to note-abs-time-with-duration forms
+(define (linearize flat-midi)
+  (map (lambda (ass-list) (list 'note-abs-time-with-duration
+                               (cdr(assoc 'abs-start-time ass-list))
+                               (cdr(assoc 'channel-no ass-list))
+                               (cdr(assoc 'note-no ass-list))
+                               (cdr(assoc 'velocity ass-list))
+                               (cdr(assoc 'duration ass-list)))) flat-midi))
+
 ; Convert fraction-durations to MIDI time units
 (define (get-note-duration length bpm)
   (let ((seconds-per-measure (* 60 (/ 4 bpm)))) ; Assuming 4/4 measures
-    (*(* length seconds-per-measure) 960) ; Seconds to MIDI time units
+    (exact-floor (*(* length seconds-per-measure) 960)) ; Seconds to MIDI time units
     )
   )
 
@@ -79,7 +126,7 @@
 ;; -------------------------------------------
 
 ; Music element class - this is the base for Notes, Sequences, and Parallel.
-(define (music-element start-time duration . music-elements)
+(define (music-element bpm start-time duration . music-elements)
   (let ((super '())
         (self 'nil))
 
@@ -92,7 +139,9 @@
       (define (get-type)       'music-element)
       (define (get-start-time) start-time)
       (define (get-duration)   duration)
-      (define (get-duration-absolute) (get-note-duration duration 100))
+      (define (get-duration-absolute) (get-note-duration duration bpm))
+      (define (get-elements) (cond ((null? music-elements) '() )
+                                   (else (car music-elements))))
       (define (get-info)(list  (get-type)
                                (get-start-time)
                                (get-duration)))
@@ -108,6 +157,7 @@
               ((eqv? message 'get-info)       get-info)
               ((eqv? message 'get-midi)       get-midi)
               ((eqv? message 'get-duration-absolute) get-duration-absolute)
+              ((eqv? message 'get-elements) get-elements)
               (else '())))
 
       (set! self dispatch)
@@ -117,8 +167,8 @@
 
 
 ; Pause class
-(define (pause start-time length)
-  (let ((super (new-part music-element start-time length))
+(define (pause bpm start-time length)
+  (let ((super (new-part music-element bpm start-time length))
         (self 'nil))
 
     (define (get-type) 'pause)
@@ -131,12 +181,12 @@
         (send 'set-self! super object-part))
 
     (define (get-midi)
-        (cons 'note-abs-time-with-duration (list
-              (get-note-duration start-time 100) ; Absolute start time
-              1  ; Channel no.
-              0  ; Note no.
-              0  ; Velocity (constant)
-              (get-note-duration length 100)))) ; Duration
+        (list
+              (cons 'abs-start-time (get-note-duration start-time bpm)) ; Absolute start time
+              (cons 'channel-no 1)  ; Channel no.
+              (cons 'note-no 0)  ; Note no.
+              (cons 'velocity 0)  ; Velocity (constant)
+              (cons 'duration (get-note-duration length bpm)))) ; Duration
 
     (define (dispatch message)
       (cond ((eqv? message 'get-info)  get-info)
@@ -149,8 +199,8 @@
     self))
 
 ; Note class
-(define (note start-time tone octave length instrument)
-  (let ((super (new-part music-element start-time length))
+(define (note bpm start-time tone octave length instrument)
+  (let ((super (new-part music-element bpm start-time length))
         (self 'nil))
 
     (let ((tone       tone)
@@ -170,12 +220,12 @@
                                (get-type)))
       
       (define (get-midi)
-        (cons 'note-abs-time-with-duration (list
-              (get-note-duration start-time 100)  ; Absolute start time
-              (instrument-to-channel instrument)  ; Channel no.
-              (note-to-midi-number tone octave)   ; Note no.
-              80                                  ; Velocity (constant)
-              (get-note-duration length 100))))    ; Duration
+        (list
+              (cons 'abs-start-time (get-note-duration start-time bpm))  ; Absolute start time
+              (cons 'channel-no (instrument-to-channel instrument))  ; Channel no.
+              (cons 'note-no (note-to-midi-number tone octave))   ; Note no.
+              (cons 'velocity 80)                                  ; Velocity (constant)
+              (cons 'duration (get-note-duration length bpm))))    ; Duration
       
       
       (define (set-self! object-part)
@@ -197,8 +247,8 @@
 
 
 ; Sequence class
-(define (sequential-music-element instrument start-time length . music-elements)
-  (let ((super (new-part music-element start-time length (car music-elements)))
+(define (sequential-music-element bpm instrument start-time length . music-elements)
+  (let ((super (new-part music-element bpm start-time length (car music-elements)))
         (self 'nil))
 
     (define (get-type) 'sequence)
@@ -219,8 +269,8 @@
     self))
 
 ; Parallel composition class
-(define (parallel-music-element instrument start-time length . music-elements)
-  (let ((super (new-part music-element start-time length (car music-elements)))
+(define (parallel-music-element bpm instrument start-time length . music-elements)
+  (let ((super (new-part music-element bpm start-time length (car music-elements)))
         (self 'nil))
 
     (define (get-type) 'parallel)
@@ -246,56 +296,56 @@
 ; Curry functions allowing us to supply the notes
 ; with an instrument and start-time at a later point.
 (define (C length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'C octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm start-time 'C octave length instrument)))
 
 (define (C# length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'C# octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'C# octave length instrument)))
 
 (define (D length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'D octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'D octave length instrument)))
 
 (define (D# length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'D# octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'D# octave length instrument)))
 
 (define (E length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'E octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'E octave length instrument)))
 
 (define (F length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'F octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'F octave length instrument)))
 
 (define (F# length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'F# octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'F# octave length instrument)))
 
 (define (G length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'G octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'G octave length instrument)))
 
 (define (G# length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'G# octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'G# octave length instrument)))
 
 (define (A length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'A octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'A octave length instrument)))
 
 (define (A# length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'A# octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'A# octave length instrument)))
 
 (define (B length octave)
-  (lambda (instrument start-time)
-    (new-instance note start-time 'B octave length instrument)))
+  (lambda ( bpm instrument start-time)
+    (new-instance note bpm  start-time 'B octave length instrument)))
 
 (define (Pause length)
-  (lambda (instrument start-time)
-    (new-instance pause start-time length)))
+  (lambda ( bpm instrument start-time)
+    (new-instance pause bpm  start-time length)))
 
 
 ; Sequence construction functions
@@ -303,18 +353,18 @@
 ; Curry functions allowing us to supply the sequences
 ; with an instrument and start-time at a later point.
 (define (sequence . music-elements)
-  (lambda (instrument start-time)
+  (lambda ( bpm instrument start-time)
     
     (define (reduce)
       (reduce-helper music-elements start-time '())) ; Start time increases for each subsequence element 
 
     (define (reduce-helper music-elements acc-time acc)
       (cond ((null? music-elements) (cons acc (- acc-time start-time))) ; Return both the accumulated music elements and the accumulated time of the sequence.
-            (else (let ((element ((car music-elements) instrument acc-time))) ; Uncurry the sequence
+            (else (let ((element ((car music-elements) bpm  instrument acc-time))) ; Uncurry the sequence
                     (reduce-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
     
     (let ((reduction (reduce))) ; reduction = (accumulated duration . music elements)
-      (new-instance sequential-music-element instrument start-time (cdr reduction) (car reduction))
+      (new-instance sequential-music-element bpm  instrument start-time (cdr reduction) (car reduction))
       )
     )
   )
@@ -324,14 +374,14 @@
 ; Curry functions allowing us to supply the parallel compositions
 ; with an instrument and start-time at a later point.
 (define (parallel . music-elements)
-  (lambda (instrument start-time)
+  (lambda ( bpm instrument start-time)
 
     (define (reduce)
       (reduce-helper music-elements '() 0)) ; Start time is 0 because we are in parallel
 
     (define (reduce-helper music-elements acc max-length)
       (cond ((null? music-elements) (cons acc max-length)) ; Return the accumulated music elements as well as the longest duration
-            (else (let ((element ((car music-elements) instrument start-time))) ; Uncurry the parallel composition
+            (else (let ((element ((car music-elements) bpm  instrument start-time))) ; Uncurry the parallel composition
                     (let ((duration (send 'get-duration element)))
                       (reduce-helper (cdr music-elements)
                                      (append acc (list element))
@@ -341,7 +391,7 @@
       )
 
     (let ((reduction (reduce))) ; reduction = (longest duration . music elements)
-    (new-instance parallel-music-element instrument start-time (cdr reduction) (car reduction))
+    (new-instance parallel-music-element bpm  instrument start-time (cdr reduction) (car reduction))
       )
     )
   )
@@ -352,21 +402,27 @@
 ; When this function is called, the curry
 ; functions are envoked fully, creating the music elements.
 (define (instrument instrum music-element)
-  (music-element instrum 0))
+  (lambda (bpm)
+    (music-element bpm instrum 0)))
 
-
-(define (song . music-elements)
+(define (song bpm  . music-elements)
   (let ((max-duration (apply max (map (lambda (x) (send 'get-duration x)) music-elements))))
-    (new-instance music-element 0 max-duration music-elements)))
+    (new-instance music-element bpm  0 max-duration music-elements)))
+
+(define (new-song bpm . music-elements)
+  (let ((instruments (map (lambda (x) (x bpm)) music-elements)))
+    (let ((max-duration (apply max (map (lambda (x) (send 'get-duration x)) instruments))))
+    (new-instance music-element bpm  0 max-duration instruments))))
 
 
-(define (flatten song)
-  (cond ((null? song) '())
-        ((eqv? (car song) 'note-abs-time-with-duration) (list song))
-        ((pair? (car song))
-         (append (flatten (car song))
-                 (flatten (cdr song))))
-        (else (cons (car song) (flatten (cdr song))))))
+(define (flatten tree)
+    (cond
+       ((null? tree) '())
+       ((atom? (car(car(car tree)))) (cons (car tree) (flatten (cdr tree)))) ; Extract association lists from the tree
+       (else
+          (append (flatten (car tree))
+                  (flatten (cdr tree)))))
+)
 
 
 ; Misc functions
@@ -413,9 +469,9 @@
                       (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (D 1/8 4)  (C# 1/8 4)  (B 1/8 3)  (Pause 1/8) (E 1/8 4)  (Pause 1/8) (C# 1/4 4) (Pause 1/4)
                       (A 1/8 3)  (B 1/8 3)   (C# 1/8 4) (D 1/8 4)   (C# 1/8 4) (Pause 1/8) (A 1/8 3)  (Pause 1/8) (C# 1/2 4) (Pause 1/2)
                       (E 1/8 4)  (D 1/8 4)   (E 1/8 4)  (Pause 1/8) (E 1/8 4)  (Pause 1/8) (E 1/8 4)  (D 1/8 4)   (E 1/8 4)  (Pause 1/8) (F# 1/8 4) (Pause 1/8) (E 1/4 4)  (Pause 1/4)
-                      (G# 1/8 4) (Pause 1/8) (G# 1/8 4) (F# 1/8 4)  (E 1/8 4) (Pause 1/8) (D 1/8 4) (Pause 1/8) (E 1/2 4) (Pause 1/2)
-                      (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (B 1/8 3) (C# 1/8 4) (D 1/8 4) (Pause 1/8) (B 1/8 3) (Pause 1/8) (C# 1/4 4) (Pause 1/4)
-                      (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (D 1/8 4) (C# 1/8 4) (Pause 1/8) (A 1/8 3) (Pause 1/8) (A 1/4 2))
+                      (G# 1/8 4) (Pause 1/8) (G# 1/8 4) (F# 1/8 4)  (E 1/8 4)  (Pause 1/8) (D 1/8 4)  (Pause 1/8) (E 1/2 4)  (Pause 1/2)
+                      (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (Pause 1/8) (C# 1/8 4) (Pause 1/8) (B 1/8 3)  (C# 1/8 4)  (D 1/8 4)  (Pause 1/8) (B 1/8 3)  (Pause 1/8) (C# 1/4 4) (Pause 1/4)
+                      (C# 1/8 4) (B 1/8 3)   (C# 1/8 4) (D 1/8 4)   (C# 1/8 4) (Pause 1/8) (A 1/8 3)  (Pause 1/8) (A 1/4 2))
 
             (sequence (A 1/4 1) (Pause 1/4) (E 1/4 2) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
                       (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/4 1) (Pause 1/4) (A 1/4 0) (E 1/4 1) (A 1/4 1) (Pause 1/4) (E 1/4 1) (Pause 1/4) (A 1/2 1) (Pause 1/2)
@@ -425,12 +481,17 @@
 
 
 ; Demo
-(define the-song (song (instrument 'guitar (sequence (sea-shanty-intro)
+(define the-song (new-song 120 (instrument 'guitar (sequence (sea-shanty-intro)
                                                      (sea-shanty-verse)))
-                       (instrument 'piano (sequence (sea-shanty-intro)
+                               (instrument 'piano (sequence  (sea-shanty-intro)
                                                      (sea-shanty-verse)))))
 
 (send 'get-duration-absolute the-song)
-(flatten(send 'get-midi the-song))
+;(send 'get-info (car(cdr(send 'get-elements the-song))))
+(send 'get-type (car (send 'get-elements the-song)))
+(define flat-midi (flatten(send 'get-midi the-song)))
 
 
+
+
+(linearize(transpose(scale (reinstrument flat-midi 'guitar) 1.5) 5))
