@@ -524,7 +524,7 @@
             (else (let ((element ((car music-elements) bpm  instrument acc-time))) ; Uncurry the sequence
                     (propagate-helper (cdr music-elements) (+ acc-time (send 'get-duration element)) (append acc (list element)))))))
     
-    (let ((propagation (propagate))) ; propagation = (accumulated duration . music elements)
+    (let ((propagation (propagate))) ; propagation = (music elements . accumulated duration)
       (new-instance sequential-music-element bpm  instrument start-time (cdr propagation) (car propagation)))))
 
 ; Parallel construction functions
@@ -555,7 +555,7 @@
                                      (cond ((> duration max-length) duration) ; Which sequence in the parallel composition has the longest duration?
                                            (else                    max-length))))))))
 
-    (let ((propagation (propagate))) ; propagation = (longest duration . music elements)
+    (let ((propagation (propagate))) ; propagation = (music elements . longest duration)
     (new-instance parallel-music-element bpm  instrument start-time (cdr propagation) (car propagation)))))
 
 
