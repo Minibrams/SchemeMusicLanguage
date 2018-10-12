@@ -238,7 +238,7 @@
 
       ; Return a list of all child music elements converted to their midi versions.
       (define (get-midi)
-        (map (lambda (element) (send 'get-midi element)) (car music-elements)))
+        (flatten(map (lambda (element) (send 'get-midi element)) (car music-elements))))
     
       (define (dispatch message)
         (cond ((eqv? message 'set-self!)      set-self!)
@@ -607,6 +607,64 @@
   (eqv? (send 'get-type music-element) 'pause))
 
 
+
+
+; Polyphony and monophony
+; ---------------------------
+
+; Extract start and end time pairs from an association list
+; Parameters:
+; 1. list-ass-lists: List of association lists
+; Output:
+; 1. List of time pairs e.g. '(('start . 0) ('end 480) ('start 240) ('end 1200))
+(define (extract-start-end-times list-ass-lists)
+  (extract-start-end-times-helper list-ass-lists '()))
+
+(define (extract-start-end-times-helper list-ass-lists acc)
+  (cond ((null? list-ass-lists) acc)
+        (else
+         
+         (let* ((ass-list (car list-ass-lists))
+         (start (cdr (assoc 'abs-start-time ass-list)))
+         (end (+ start (cdr(assoc 'duration ass-list))))
+         (pause? (= 0 (cdr (assoc 'velocity ass-list)))))
+
+           (cond (pause?  (extract-start-end-times-helper (cdr list-ass-lists) acc))             ; Pauses don't count
+                 (else    (extract-start-end-times-helper (cdr list-ass-lists) (append acc (list ; ... but notes do
+                                                                                            (cons 'start start)
+                                                                                            (cons 'end end))))))))))
+; Comparison function used when sorting starting and ending time pairs
+(define (less-than-abs-times x y)
+  (let ((x-time (cdr x))
+        (y-time (cdr y)))
+    (< x-time y-time)))
+
+; Calculates the degree of polyphony over a list of association lists.
+; Parameters:
+; 1. list-of-association-lists: List of association lists (the result of 'get-midi from a music element).
+; Output:
+; 1. An integer represent the maximum number of notes playing simultaneously. Does not include pauses. 
+(define (degree-of-polyphony list-of-association-lists)
+  (let ((start-end-list (extract-start-end-times list-of-association-lists)))
+    (degree-of-polyphony-helper (sort start-end-list less-than-abs-times) 0 0)))
+
+(define (degree-of-polyphony-helper sorted-time-list counter max-counter)
+  (cond ((null? sorted-time-list) max-counter)
+        (else
+         (let* ((time-type (car (car sorted-time-list)))
+                (counter (cond ((eqv? 'start time-type) (+ counter 1))
+                               (else                    (- counter 1)))))
+           (degree-of-polyphony-helper (cdr sorted-time-list) counter (cond ((> counter max-counter) counter)
+                                                                            (else max-counter)))))))
+
+; Predicate function for whether or not more than one notes are playing at the same time. 
+(define (monophonic? list-of-association-lists)
+  (> 1 (degree-of-polyphony list-of-association-lists)))
+
+
+
+
+
 ; Misc functions
 ; ---------------------------
 ; Chord construction function - simply constructs a parallel composition with a given length and predefined notes.
@@ -712,25 +770,36 @@
 ; We can access the parts of all the music elements by sending messages to them.
 
 ; Get the type (should just be a music element):
-(send 'get-type the-song) 
+(writeln "The type of the song is:")
+(send 'get-type the-song)
+(writeln "---------------------------------")
 
 ; Get the type of the first music element in the song (should be the guitar sequence above):
+(writeln "The type of the first element in the song (should be the first guitar sequence): ")
 (send 'get-type (car (send 'get-elements the-song)))
+(writeln "---------------------------------")
 
 ; Get the duration, either as the sum of the time signatures or the absolute time in time ticks:
+(writeln "Duration as sum of time signatures: ")
 (send 'get-duration the-song) ; Time signature total time
+(writeln "... and in time ticks: ")
 (send 'get-duration-absolute the-song) ; Time ticks
+(writeln "---------------------------------")
 
 ; Auxiliary predicate functions allow us to figure out the type of an element:
 (define first-sequence (car (send 'get-elements the-song)))
 
+(writeln "Is the first sequence a sequence? ")
 (sequence? first-sequence)      ; Yes
+(writeln "Is it a music element? ")
 (music-element? first-sequence) ; Also yes
+(writeln "Is it a note? ")
 (note? first-sequence)          ; No
+(writeln "---------------------------------")
 
 ; Before we can export the song as a MIDI file, it must first be converted to a more easily
 ; manageable association list by calling the 'get-midi' method that all music-elements provide:
-(define flat-midi (flatten(send 'get-midi the-song)))
+(define flat-midi (send 'get-midi the-song))
 
 ; From here, we can transpose, scale, and reinstrument the song if so needed:
 
@@ -738,8 +807,18 @@
 ; Play the song one octave higher: (transpose flat-midi 12)
 ; Play the song only with guitars: (reinstrument flat-midi 'guitar)
 
+; We can also determine the degree of polyphony of the song from its flat-midi association list representation:
+(writeln "What is the degree of polyphony? ")
+(degree-of-polyphony flat-midi)
+; .. whether or not it is monophonic:
+(writeln "Is it monophonic? ")
+(monophonic? flat-midi)
+(writeln "---------------------------------")
+
 ; Linearize the song into 'note-abs-time-with-duration' forms:
 (define abs-time-notes-with-duration (linearize flat-midi))
 
 ; Export the song as a MIDI file:
+(writeln "Exporting MIDI to midi.mid...")
 (transform-to-midi-file-and-write-to-file! abs-time-notes-with-duration "midi.mid")
+
