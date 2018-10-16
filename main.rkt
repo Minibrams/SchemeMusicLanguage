@@ -1,3 +1,7 @@
+; Anders Højlund Brams
+; 20143514
+; abrams14@student.aau.dk
+
 #lang racket
 (require "music-base.rkt")
 
@@ -81,7 +85,7 @@
 ; Transpose a list of association lists.
 ;
 ; Parameters:
-; 1. flat-midi:  List of association lists created from unrolling music elements
+; 1. flat-midi: List of association lists created from unrolling music elements
 ;               with 'get-midi'.
 ; 2. amount: Integer representing the midi-number range to transpose by.
 (define (transpose flat-midi amount)
