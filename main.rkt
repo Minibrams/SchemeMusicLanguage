@@ -10,6 +10,9 @@
 ;; General Utility Functions
 ;; -------------------------------------------
 
+(define (>= x y)
+  (or (> x y) (= x y)))
+
 ; Used for replacing key-value pairs in association lists.
 ;
 ; Parameters:
@@ -652,6 +655,7 @@
   (let ((start-end-list (extract-start-end-times list-of-association-lists)))
     (degree-of-polyphony-helper (sort start-end-list less-than-abs-times) 0 0)))
 
+; Increment counter when we see a start note, decrement when we see an end note. Save the largest counter. 
 (define (degree-of-polyphony-helper sorted-time-list counter max-counter)
   (cond ((null? sorted-time-list) max-counter)
         (else
@@ -663,7 +667,7 @@
 
 ; Predicate function for whether or not more than one notes are playing at the same time. 
 (define (monophonic? list-of-association-lists)
-  (> 1 (degree-of-polyphony list-of-association-lists)))
+  (>= 1 (degree-of-polyphony list-of-association-lists)))
 
 
 
